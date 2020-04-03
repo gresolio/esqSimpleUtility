@@ -1,0 +1,22 @@
+﻿<Window x:Class="esqSimpleUtility.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:esqSimpleUtility"
+        xmlns:views="clr-namespace:esqSimpleUtility.Views"
+        xmlns:viewModels="clr-namespace:esqSimpleUtility.ViewModel"
+        mc:Ignorable="d"
+        Title="esqSimpleUtility"
+        Height="450" Width="500"
+        MinHeight="350" MinWidth="350"
+        DataContext="{Binding Main, Source={StaticResource Locator}}">
+
+    <Window.Resources>
+        <DataTemplate DataType = "{x:Type viewModels:SimpleUtilityViewModel}">
+            <views:SimpleUtilityView/>
+        </DataTemplate>
+    </Window.Resources>
+
+    <ContentControl Content="{Binding CurrentViewModel}" />
+</Window>
