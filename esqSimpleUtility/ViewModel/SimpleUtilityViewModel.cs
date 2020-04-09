@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
-using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
 using GalaSoft.MvvmLight;
 using GalaSoft.MvvmLight.CommandWpf;
@@ -60,19 +60,19 @@ namespace esqSimpleUtility.ViewModel
         public ICommand ClearFilterCommand { get; private set; } // Without CommandParameter
 
         // SortMode and FilterMode options
-        private enum Mode
+        public enum Mode
         {
             None = 0,
             ByName = 1,
             ByValue = 2,
         }
 
-        private IDataService dataService;
-        private List<NameValuePair> lastKnownData;
-
         private Mode currentSortMode = Mode.None;
         private Mode currentFilterMode = Mode.None;
-        private string currentFilter = string.Empty;
+        private string currentFilterText = string.Empty;
+        private Predicate<object> currentFilter = null;
+
+        private IDataService dataService;
 
         public SimpleUtilityViewModel(IDataService dataService)
         {
@@ -82,31 +82,11 @@ namespace esqSimpleUtility.ViewModel
             DeleteCommand = new RelayCommand<IList<object>>(DeleteSelected, (selected) => selected?.Count > 0);
 
             SortCommand = new RelayCommand<string>(SetSortMode);
-            ApplyFilterCommand = new RelayCommand<string>(ApplyFilter, (input) => !HasErrors);
+            ApplyFilterCommand = new RelayCommand<string>(SetFilter, (input) => IsValidFilterType(input));
             ClearFilterCommand = new RelayCommand(ClearFilter, () => currentFilterMode != Mode.None);
 
             InputText = "name = value";
             FetchItems();
-        }
-
-        private void UpdateListView()
-        {
-            IEnumerable<NameValuePair> items;
-
-            switch (currentFilterMode)
-            {
-                case Mode.ByName:
-                    items = lastKnownData.Where(x => x?.Name == currentFilter);
-                    break;
-                case Mode.ByValue:
-                    items = lastKnownData.Where(x => x?.Value == currentFilter);
-                    break;
-                default:
-                    items = lastKnownData;
-                    break;
-            }
-
-            ListViewItems = new ObservableCollection<NameValuePair>(items);
         }
 
         private void UpdateStatusBar()
@@ -115,16 +95,14 @@ namespace esqSimpleUtility.ViewModel
             StatusBarSort = $"Sort = {currentSortMode}";
 
             if (currentFilterMode != Mode.None)
-                StatusBarFilter = $"Filter = {currentFilterMode} \"{currentFilter}\"";
+                StatusBarFilter = $"Filter = {currentFilterMode} \"{currentFilterText}\"";
             else
                 StatusBarFilter = $"Filter = {currentFilterMode}";
         }
 
         private void FetchItems()
         {
-            lastKnownData = dataService.GetAll();
-            SortFetchedData();
-            UpdateListView();
+            ListViewItems = new ObservableCollection<NameValuePair>(dataService.GetAll());
             UpdateStatusBar();
         }
 
@@ -132,41 +110,27 @@ namespace esqSimpleUtility.ViewModel
         {
             if (NameValuePair.TryParse(input, out var pair))
             {
-                dataService.Add(pair);
-                FetchItems();
+                if (dataService.Add(pair))
+                    ListViewItems.Add(pair);
+
+                UpdateStatusBar();
             }
         }
 
         private void DeleteSelected(IList<object> param)
         {
-            if (param.Count > 0)
+            if (param?.Count > 0)
             {
-                var selectedItems = param.Cast<NameValuePair>();
+                var selectedItems = param.Cast<NameValuePair>().ToList();
 
                 foreach (var item in selectedItems)
-                    dataService.Delete(item.Id);
-
-                FetchItems();
-            }
-        }
-
-        private void SortFetchedData()
-        {
-            if (lastKnownData == null || currentSortMode == Mode.None)
-                return;
-
-            lastKnownData.Sort((lhs, rhs) =>
-            {
-                switch (currentSortMode)
                 {
-                    case Mode.ByName:
-                        return lhs.Name.CompareTo(rhs.Name);
-                    case Mode.ByValue:
-                        return lhs.Value.CompareTo(rhs.Value);
-                    default:
-                        return lhs.Name.CompareTo(rhs.Name);
+                    if (dataService.Delete(item.Id))
+                        ListViewItems.Remove(item);
                 }
-            });
+
+                UpdateStatusBar();
+            }
         }
 
         private void SetSortMode(string param)
@@ -176,37 +140,45 @@ namespace esqSimpleUtility.ViewModel
                 if (currentSortMode != mode)
                 {
                     currentSortMode = mode;
-                    SortFetchedData();
-                    UpdateListView();
+                    ApplySortMode();
                     UpdateStatusBar();
                 }
             }
         }
 
-        private void ApplyFilter(string input)
+        private bool IsValidFilterType(string input)
+        {
+            if (NameValuePair.TryParse(input, out var pair))
+                return (pair.Name == "Name" || pair.Name == "Value");
+
+            return false;
+        }
+
+        private void SetFilter(string input)
         {
             if (NameValuePair.TryParse(input, out var pair))
             {
                 string filterType = pair.Name;
-
                 switch (filterType)
                 {
                     case "Name":
                         currentFilterMode = Mode.ByName;
-                        currentFilter = pair.Value;
+                        currentFilterText = pair.Value;
+                        currentFilter = (obj) => (obj is NameValuePair x && x.Name == currentFilterText);
                         break;
                     case "Value":
                         currentFilterMode = Mode.ByValue;
-                        currentFilter = pair.Value;
+                        currentFilterText = pair.Value;
+                        currentFilter = (obj) => (obj is NameValuePair x && x.Value == currentFilterText);
                         break;
                     default:
                         currentFilterMode = Mode.None;
-                        currentFilter = string.Empty;
-                        MessageBox.Show("Filter <type> is either Name or Value.", "Filter", MessageBoxButton.OK, MessageBoxImage.Information);
+                        currentFilterText = "";
+                        currentFilter = null;
                         break;
                 }
 
-                UpdateListView();
+                ApplyFilter();
                 UpdateStatusBar();
             }
         }
@@ -214,10 +186,38 @@ namespace esqSimpleUtility.ViewModel
         private void ClearFilter()
         {
             currentFilterMode = Mode.None;
-            currentFilter = string.Empty;
+            currentFilterText = "";
+            currentFilter = null;
 
-            UpdateListView();
+            ApplyFilter();
             UpdateStatusBar();
+        }
+
+        private void ApplySortMode()
+        {
+            ICollectionView view = CollectionViewSource.GetDefaultView(ListViewItems);
+            if (view != null)
+            {
+                view.SortDescriptions.Clear();
+                switch (currentSortMode)
+                {
+                    case Mode.ByName:
+                        view.SortDescriptions.Add(new SortDescription("Name", ListSortDirection.Ascending));
+                        break;
+                    case Mode.ByValue:
+                        view.SortDescriptions.Add(new SortDescription("Value", ListSortDirection.Ascending));
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        private void ApplyFilter()
+        {
+            ICollectionView view = CollectionViewSource.GetDefaultView(ListViewItems);
+            if (view != null)
+                view.Filter = currentFilter;
         }
 
         // ViewModelBase in MVVM Light Toolkit doesn't provide INotifyDataErrorInfo functionality.

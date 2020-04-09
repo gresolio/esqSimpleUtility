@@ -33,8 +33,7 @@ namespace esqSimpleUtility.Tests
 
             pair = data.Find(x => x?.Id == testPair.Id);
             Assert.IsNotNull(pair);
-            Assert.AreEqual(testPair.Name, pair.Name);
-            Assert.AreEqual(testPair.Value, pair.Value);
+            Assert.IsTrue(pair.Equals(testPair));
 
             // Delete
             result = service.Delete(pair.Id);

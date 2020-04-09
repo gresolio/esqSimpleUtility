@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace esqSimpleUtility.Tools
 {
@@ -10,46 +11,23 @@ namespace esqSimpleUtility.Tools
             if (string.IsNullOrEmpty(str))
                 return false;
 
-            if (alphanumRegex.IsMatch(str))
-                return true;
-            else
-                return false;
+            return alphanumRegex.IsMatch(str);
         }
 
-        public static uint CountLeadingSpaces(this string str)
+        public static int CountLeadingSpaces(this string str)
         {
-            uint count = 0;
+            if (string.IsNullOrEmpty(str))
+                return 0;
 
-            if (!string.IsNullOrEmpty(str))
-            {
-                for (int i = 0; i < str.Length; i++)
-                {
-                    if (str[i] == ' ')
-                        count++;
-                    else
-                        break;
-                }
-            }
-
-            return count;
+            return str.TakeWhile(c => c == ' ').Count();
         }
 
-        public static uint CountTrailingSpaces(this string str)
+        public static int CountTrailingSpaces(this string str)
         {
-            uint count = 0;
+            if (string.IsNullOrEmpty(str))
+                return 0;
 
-            if (!string.IsNullOrEmpty(str))
-            {
-                for (int i = str.Length - 1; i >= 0; i--)
-                {
-                    if (str[i] == ' ')
-                        count++;
-                    else
-                        break;
-                }
-            }
-
-            return count;
+            return str.Reverse().TakeWhile(c => c == ' ').Count();
         }
     }
 }

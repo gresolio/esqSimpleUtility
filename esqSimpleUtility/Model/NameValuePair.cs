@@ -12,14 +12,18 @@ namespace esqSimpleUtility.Model
         // To support this interesting feature:
         // "spaces before and/or after the equal-sign may be
         // entered as padding at the end-user’s discretion".
-        public uint PaddingLeft { get; set; }
-        public uint PaddingRight { get; set; }
+        public int PaddingLeft { get; set; }
+        public int PaddingRight { get; set; }
 
         public override string ToString()
         {
             string eq = "=";
-            eq = eq.PadLeft(eq.Length + (int)PaddingLeft);
-            eq = eq.PadRight(eq.Length + (int)PaddingRight);
+
+            if (PaddingLeft > 0)
+                eq = eq.PadLeft(eq.Length + PaddingLeft);
+
+            if (PaddingRight > 0)
+                eq = eq.PadRight(eq.Length + PaddingRight);
 
             return $"{Name}{eq}{Value}";
         }
@@ -34,8 +38,8 @@ namespace esqSimpleUtility.Model
                     string name = arr[0];
                     string value = arr[1];
 
-                    uint paddingLeft = name.CountTrailingSpaces();
-                    uint paddingRight = value.CountLeadingSpaces();
+                    int paddingLeft = name.CountTrailingSpaces();
+                    int paddingRight = value.CountLeadingSpaces();
                     name = name.Trim();
                     value = value.Trim();
 
